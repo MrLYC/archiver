@@ -359,7 +359,7 @@ func (t *Tar) Create(out io.Writer) error {
 }
 
 // Write writes f to t, which must have been opened for writing first.
-func (t *Tar) Write(f File) error {
+func (t *Tar) Write(f File) (err error) {
 	if t.tw == nil {
 		return fmt.Errorf("tar archive was not created for writing first")
 	}
@@ -370,18 +370,21 @@ func (t *Tar) Write(f File) error {
 		return fmt.Errorf("missing file name")
 	}
 
-	var linkTarget string
-	if isSymlink(f) {
-		var err error
-		linkTarget, err = os.Readlink(f.Name())
-		if err != nil {
-			return fmt.Errorf("%s: readlink: %v", f.Name(), err)
+	hdr, ok := f.Header.(*tar.Header)
+	if !ok || hdr == nil {
+		var linkTarget string
+		if isSymlink(f) {
+			var err error
+			linkTarget, err = os.Readlink(f.Name())
+			if err != nil {
+				return fmt.Errorf("%s: readlink: %v", f.Name(), err)
+			}
 		}
-	}
 
-	hdr, err := tar.FileInfoHeader(f, filepath.ToSlash(linkTarget))
-	if err != nil {
-		return fmt.Errorf("%s: making header: %v", f.Name(), err)
+		hdr, err = tar.FileInfoHeader(f, filepath.ToSlash(linkTarget))
+		if err != nil {
+			return fmt.Errorf("%s: making header: %v", f.Name(), err)
+		}
 	}
 
 	err = t.tw.WriteHeader(hdr)
